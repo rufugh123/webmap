@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.19/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.25/"></script>
+
+    <style>
+        html,
+        body {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #viewDiv {
+            position:absolute;
+            left: 0;
+            right: 21%;
+            top: 0;
+            bottom: 0;
+            height: 100%;
+        }
+        #viewslide
+        {
+            position: absolute;
+            left: 0;
+            right:0;
+            top: 0;
+            bottom: 0;
+            height: 100%;
+        }
+
+        #panel {
+            position:absolute;
+            right: 0;
+            height: 100%;
+            width:21%;
+            overflow: scroll;
+        }
+
+        #num-homicides {
+            color: #d3c6a6;
+            font-size: 36pt;
+            font-weight: bolder;
+            line-height: 0.8;
+        }
+        #avg-age {
+            color: #3c3645;
+            font-size: 20pt;
+            font-weight: bolder;
+        }
+        #avg-open-time {
+            color: #9b95c9;
+            font-size: 20pt;
+            font-weight: bolder;
+        }
+        #infoDiv {
+              background: white;
+              padding: 10px;
+          }
+
+        #infoDiv1 {
+            position: absolute;
+            top: 15px;
+            left: 60px;
+        }
+
+        #infoDiv1 input {
+            border: none;
+            box-shadow: rgba(0, 0, 0, 0.3) 0px 1px 2px;
+        }
+        #appContainer {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            width: 100%;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 45px;
+            height: 22px;
+            vertical-align: middle;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: 0.4s;
+            transition: 0.4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 1px;
+            background-color: white;
+            -webkit-transition: 0.4s;
+            transition: 0.4s;
+        }
+
+        input:checked + .slider {
+            background-color: #9b95c9;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #9b95c9;
+        }
+
+        input:checked + .slider:before {
+            -webkit-transform: translateX(20px);
+            -ms-transform: translateX(20px);
+            transform: translateX(20px);
+        }
+
+        /* Rounded sliders */
+
+        .slider.round {
+            border-radius: 20px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+        .labelText {
+            padding-left: 5px;
+            font-size: 15px;
+        }
+
+        #mainDiv {
+            padding: 8px;
+        }
+    </style>
+
+    <script>
+        require([
+            "esri/config",
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer",
+            "esri/Graphic",
+            "esri/layers/GeoJSONLayer",
+            "esri/layers/CSVLayer",
+            "esri/widgets/FeatureTable",
+            "esri/WebMap",
+            "esri/widgets/Legend",
+            "esri/widgets/Expand",
+            "esri/widgets/Bookmarks",
+            "esri/core/lang",
+            "esri/core/promiseUtils",
+            "esri/core/reactiveUtils",
+            "esri/widgets/Home",
+            "esri/smartMapping/labels/clusters",
+            "esri/smartMapping/popup/clusters",
+            "esri/layers/support/FeatureFilter",
+            "esri/layers/support/FeatureEffect",
+            "esri/layers/FeatureLayer",
+            "esri/views/SceneView",
+            "esri/WebScene",
+            "esri/layers/IntegratedMeshLayer",
+            "esri/renderers/HeatmapRenderer",
+            'esri/geometry/geometryEngine'
+            ], function (esriConfig,
+                                                    Map,
+                                                    MapView,
+                                                    FL,
+                                                    Graphic,
+                                                    GeoJSONLayer,
+                                                    csvlayer,
+                                                    FeatureTable,
+                                                  WebMap,
+                         Legend, Expand, Bookmarks, lang,
+                         promiseUtils,reactiveUtils,Home,
+                         clusterLabelCreator, clusterPopupCreator,
+                         FeatureFilter,FeatureEffect,
+                         FeatureLayer,SceneView,
+                         WebScene,IntegratedMeshLayer,
+                         HeatmapRenderer,geometryEngine) {
+
+            esriConfig.apiKey = "AAPK56e3ac027f044c4089d8ceec232fc05dYaOuzVRzm8tMRqvzOvDvIEevbqJ85yppn9PacU6cy4duurJrVK9wo_8BcWO8i8bi";
+
+            const map = new Map({
+                basemap: "arcgis-streets-night"
+            });
+
+
+            const scene = new WebScene({
+                portalItem: {
+                    // autocasts as new PortalItem()
+                    id: "c8cf26d7acab4e45afcd5e20080983c1"
+                }
+            });
+
+            const less35 = {
+                type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                color: [246,245,236, 0.4],
+                style: "solid",
+                outline: {
+                    width: 0.2,
+                    color: [255, 255, 255, 0.5]
+                }
+            };
+
+            const less50 = {
+                type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                color: [171,158,178,0.6],
+                style: "solid",
+                outline: {
+                    width: 0.2,
+                    color: [255, 255, 255, 0.5]
+                }
+            };
+
+            const more50 = {
+                type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                color: [89,76,109, 0.6],
+                style: "solid",
+                outline: {
+                    width: 0.2,
+                    color: [255, 255, 255, 0.5]
+                }
+            };
+
+            const more75 = {
+                type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                color: [60,47,85, 0.6],
+
+                style: "solid",
+                outline: {
+                    width: 0.2,
+                    color: [255, 255, 255, 0.5]
+                }
+            };
+            const evenmore75 = {
+                type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                color: [21,2,39, 0.6],
+
+                style: "solid",
+                outline: {
+                    width: 0.2,
+                    color: [255, 255, 255, 0.5]
+                }
+            };
+
+            // 第二步，指定渲染器
+            const renderer1 = {
+                type: "class-breaks", // autocasts as new ClassBreaksRenderer()
+                field: "cov", // total number
+                defaultSymbol: {
+                    type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                    color: "black",
+                    style: "backward-diagonal",
+                    outline: {
+                        width: 0.5,
+                        color: [50, 50, 50, 0.6]
+                    }
+                },
+                classBreakInfos: [
+                    {
+                        minValue: 0,
+                        maxValue: 5000,
+                        symbol: less35,
+
+                        label: "0-5000人" // label for symbol in legend
+                    },
+                    {
+                        minValue: 5000,
+                        maxValue: 20000,
+                        symbol: less50,
+
+                        label: "5000-20000人" // label for symbol in legend
+                    },
+                    {
+                        minValue: 20000,
+                        maxValue: 50000,
+                        symbol: more50,
+
+                        label: "20000-50000人" // label for symbol in legend
+                    },
+                    {
+                        minValue: 50000,
+                        maxValue: 140000,
+                        symbol: more75,
+
+                        label: "50000-140000人" // label for symbol in legend
+                    },
+                    {
+                        minValue: 140000,
+                        maxValue: 400000,
+                        symbol: evenmore75,
+
+                        label: "140000以上人" // label for symbol in legend
+                    }
+                ],
+                defaultLabel: "no data" // legend label for features that don't match a class break
+            };
+
+
+            //geojsonLayer.renderer = renderer;
+            const ubaby = new GeoJSONLayer
+            ({
+                url: "./data/usa1.json",
+                outFields: ['*'],
+                copyright: "none",
+                //featureReduction: clusterConfig,
+
+                popupTemplate: {
+                    title: "{name}",
+                    content: [
+
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                {
+                                    fieldName: "NAME_1",
+                                    label: "地区"
+                                },
+                                {
+                                    fieldName: "cov",
+                                    label: "得新冠人数"
+                                }
+
+                            ]
+                        }
+                    ],
+
+                },
+            });
+            const ubaby1 = new GeoJSONLayer
+            ({
+                url: "./data/usa1.json",
+                outFields: ['*'],
+                copyright: "none",
+                //featureReduction: clusterConfig,
+
+                popupTemplate: {
+                    title: "{name}",
+                    content: [
+
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                {
+                                    fieldName: "NAME_1",
+                                    label: "地区"
+                                },
+                                {
+                                    fieldName: "cov",
+                                    label: "得新冠人数"
+                                }
+
+                            ]
+                        }
+                    ],
+
+                },
+            });
+            ubaby.renderer = renderer1
+            ubaby1.renderer = renderer1
+            map.add(ubaby)
+           scene.add(ubaby1)
+            const csvLayer = new csvlayer({
+                        title: "2019-2022年美国发生的暴乱",
+                        url: "./data/vioAmerican.csv",
+                        outFields: ['*'],
+                        copyright: "none",
+                        //featureReduction: clusterConfig,
+
+                        popupTemplate: {
+                            title: "{name}",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: "{notes}"
+                                },
+                                {
+                                    type: "fields",
+                                    fieldInfos: [
+                                        {
+                                            fieldName: "year",
+                                            label: "year"
+                                        },
+                                        {
+                                            fieldName: "location",
+                                            label: "location"
+                                        },
+                                        {
+                                            fieldName: "event_type",
+                                            label:"event -type"
+                                        }
+                                    ]
+                                }
+                            ],
+
+                        },
+                        renderer: {
+                            type: "unique-value",
+                            field: "year",
+                            uniqueValueInfos:
+                                [
+
+                                    {   value:'2020',
+                                        symbol: {
+                                            type: "picture-marker",
+                                            url: "./data/img/horror2020.png"
+                                        },
+                                        label:'2020'
+                                    },{   value:'2021',
+                                    symbol: {
+                                        type: "picture-marker",
+                                        url: "./data/img/horror2021.png"
+                                    },label:'2021'
+                                },{   value:'2022',
+                                    symbol: {
+                                        type: "picture-marker",
+                                        url: "./data/img/horror2022.png"
+                                    },label:'2022'
+                                }
+                                ]
+                        }
+
+                    });
+                    console.log(csvLayer)
+                    map.add(csvLayer);
+                    csvLayer.when()
+                        .then(generateClusterConfig)
+                        .then((featureReduction) => {
+
+                            csvLayer.featureReduction = featureReduction;
+
+                            const toggleButton = document.getElementById("toggle-cluster");
+                            toggleButton.addEventListener("click", toggleClustering);
+
+                            // To turn off clustering on a layer, set the
+                            // featureReduction property to null
+                            function toggleClustering() {
+                                if(isWithinScaleThreshold()){
+                                    let fr = csvLayer.featureReduction;
+                                    csvLayer.featureReduction =
+                                        fr && fr.type === "cluster" ? null : featureReduction;
+                                }
+                                toggleButton.innerText =
+                                    toggleButton.innerText === "聚类"
+                                        ? "取消聚类"
+                                        : "聚类";
+                            }
+                            view.whenLayerView(csvLayer).then((layerView) => {
+                                const filterSelect = document.getElementById("filter");
+                                filterSelect.addEventListener("change", (event) => {
+                                    const newValue = event.target.value;
+                                    const whereClause = newValue?`year=${newValue}`: null;
+                                    console.log(whereClause)
+                                    layerView.filter = new FeatureFilter({
+                                        where: whereClause
+                                    });
+                                    view.popup.close();
+                                });
+                            });
+
+                            view.watch("scale", (scale) => {
+                                if(toggleButton.innerText === "取消聚类"){
+                                    csvLayer.featureReduction = isWithinScaleThreshold() ? featureReduction : null;
+                                }
+                            })
+                        }).catch((error) => {
+                        console.error(error);
+                    });
+
+                    function isWithinScaleThreshold(){
+                        return view.scale > 500000;
+                    }
+
+
+                    async function generateClusterConfig(layer){
+
+                        // generates default popupTemplate
+                        const popupTemplate = await clusterPopupCreator
+                            .getTemplates({ layer })
+                            .then(popupTemplateResponse => popupTemplateResponse.primaryTemplate.value);
+
+
+                        // generates default labelingInfo
+                        const { labelingInfo, clusterMinSize } = await clusterLabelCreator
+                            .getLabelSchemes({ layer, view })
+                            .then(labelSchemes => labelSchemes.primaryScheme );
+
+
+                        return {
+                            type: "cluster",
+                            popupTemplate,
+                            labelingInfo,
+                            clusterMinSize
+                        };
+                    }
+
+
+            const appConfig = {
+                mapView: null,
+                sceneView: null,
+                activeView: null,
+                container: "viewDiv" // use same container for views
+            };
+                    let yearChart,
+                        ageChart,
+                        dispositionChart,
+                        raceChart,
+                        totalNumber,
+                        avgAge,
+                        avgOpenTime;
+
+            const view = new MapView({
+                map: map,
+                container: appConfig.container,
+                center: [-100, 40.32], // Longitude, latitude
+                zoom: 4, // Zoom level
+                constraints: {
+                    minScale: 300000000
+                },
+                highlightOptions: {
+                    color: "#f6f5ec",
+                    haloOpacity: 1,
+                    fillOpacity: 0.5
+                },
+                popup: {
+                    dockEnabled: true,
+                    dockOptions: {
+                        breakpoint: false
+                    }
+                }
+            });
+            const colorVisVar = {
+                type: "color",
+                field: "cov",
+                stops: [
+                    { value: 947, color: "#FFFCD4" },
+                    { value: 131710, color: "#0D2644" }
+                ],
+                legendOptions: {
+                    title: "Population per square kilometer"
+                }
+            };
+
+
+
+            /*****************************************************************
+             * Prepare the heatmap renderer and create the feature layer with incidents
+             *****************************************************************/
+            const colorStops = [
+                { ratio: 0 / 12, color: "rgba(26, 10, 56, 0.6)" },
+                { ratio: 2 / 12, color: "rgba(57, 35, 98, 1)" },
+                { ratio: 3 / 12, color: "rgba(85, 60, 175 , 1)" },
+                { ratio: 4 / 12, color: "rgba(116, 98, 194, 1)" },
+                { ratio: 5 / 12, color: "rgba(134, 114, 209, 1)" },
+                { ratio: 6 / 12, color: "rgba(175, 157, 224, 1)" },
+                { ratio: 7 / 12, color: "rgba(194, 182, 240, 1)" },
+                { ratio: 8 / 12, color: "rgba(207, 196, 255, 1)" },
+                { ratio: 9 / 12, color: "rgba(211, 222, 255, 1)" },
+                { ratio: 10 / 12, color: "rgba(219, 233, 255, 1)" },
+                { ratio: 11 / 12, color: "rgba(220, 233, 237, 1)" },
+                { ratio: 12 / 12, color: "rgba(233, 233, 233, 1)" }
+            ];
+
+            const heatmapRenderer = new HeatmapRenderer({
+                legendOptions: {
+                    minLabel: "Few",
+                    maxLabel: "Frequent"
+                },
+                colorStops: colorStops,
+                referenceScale: null,
+                maxDensity: 0.8,
+                radius: 20,
+                minDensity: 0
+
+            });
+
+
+            const csvLayer1 = new csvlayer({
+                title: "2019-2022年美国发生的暴乱",
+                url: "./data/vioAmerican.csv",
+                opacity: 0.75,
+                renderer: heatmapRenderer});
+            /*****************************************************************
+             * Create the scene view with layers
+             *****************************************************************/
+            const view1 = new SceneView({
+                container:null,
+                map: scene,
+                center: [-100, 40.32], // Longitude, latitude
+                zoom: 4, // Zoom level
+            });
+
+
+            const legend1 = new Legend({
+                view: view1,
+                layerInfos: [
+                    {
+                        layer: csvLayer1,
+                        title: "暴乱事件热度图"
+                    }
+                ]
+            });
+            scene.add(csvLayer1)
+            view1.ui.add(legend1, "bottom-left");
+
+            const switchButton = document.getElementById("switch-btn");
+
+            // create 2D view and and set active
+            appConfig.mapView =view;
+            appConfig.mapView.map = map;
+            appConfig.activeView = appConfig.mapView;
+            // create 3D view, won't initialize until container is set
+            appConfig.sceneView = view1;
+            // switch the view between 2D and 3D each time the button is clicked
+            switchButton.addEventListener("click", () => {
+                switchView();
+            });
+            //scene.add(csvLayer)
+            // Switches the view from 2D to 3D and vice versa
+            function switchView() {
+                const is3D = appConfig.activeView.type === "3d";
+                const activeViewpoint = appConfig.activeView.viewpoint.clone();
+
+                // remove the reference to the container for the previous view
+                appConfig.activeView.container = null;
+
+                if (is3D) {
+                    // if the input view is a SceneView, set the viewpoint on the
+                    // mapView instance. Set the container on the mapView and flag
+                    // it as the active view
+                    appConfig.mapView.map = map;
+                    appConfig.mapView.container = appConfig.container;
+                    appConfig.activeView = appConfig.mapView;
+                    switchButton.value = "3D";
+                    const layer = map.layers.getItemAt(1);
+                    layer.outFields = ['*'];
+                    view.whenLayerView(layer).then((layerView) => {
+                        reactiveUtils
+                            .whenOnce(() => !layerView.updating)
+                            .then(() => {
+                                // Query layer view statistics as the user clicks
+                                // or drags the pointer across the view.
+                                view.on(["drag"], (event) => {
+                                    // disables navigation by pointer drag
+                                    event.stopPropagation();
+                                    queryStatsOnDrag(layerView, event)
+                                        .then(updateCharts)
+                                        .catch((error) => {
+                                            if (error.name !== "AbortError") {
+                                                console.error(error);
+                                            }
+                                        });
+                                });
+                            });
+                    });
+                } else {
+                    appConfig.sceneView.viewpoint = activeViewpoint;
+                    appConfig.sceneView.container = appConfig.container;
+                    appConfig.activeView = appConfig.sceneView;
+                    switchButton.value = "2D";
+                }
+            }
+
+            // convenience function for creating either a 2D or 3D view dependant on the type parameter
+
+            view.ui.add(
+                new Home({
+                    view: view
+                }),
+                "top-left"
+            );
+
+            // Displays instructions to the user for understanding the sample
+            // And places them in an Expand widget instance
+
+            const titleContent = document.createElement("div");
+            titleContent.style.padding = "15px";
+            titleContent.style.backgroundColor = "white";
+            titleContent.style.width = "500px";
+            titleContent.innerHTML = [
+                "<div id='title' class='esri-widget'>",
+                "在过去 3 年中，在指针位置的 100 英里范围内发生了<span id='num-homicides'>0</span>场骚乱。",
+                "平均每年发生的次数为 <span id='avg-age'>0</span>." ,
+                "其中抗议游行普遍居多，每年发生的平均次数为<span id='avg-open-time'>0</span>",
+                "</div>"
+            ].join(" ");
+
+            const titleExpand = new Expand({
+                expandIconClass: "esri-icon-dashboard",
+                expandTooltip: "Summary stats",
+                view: view,
+                content: titleContent,
+                expanded: view.widthBreakpoint !== "xsmall"
+            });
+            view.ui.add(titleExpand, "top-right");
+            const legend = new Legend({
+                view,
+                container: "legendDiv"
+            });
+
+            const infoDiv = document.getElementById("infoDiv");
+            view.ui.add(
+                new Expand({
+                    view,
+                    content: infoDiv,
+                    expandIconClass: "esri-icon-layer-list",
+                    expanded: false
+                }), "top-left");
+            view.watch("widthBreakpoint", (newValue) => {
+                titleExpand.expanded = newValue !== "xsmall";
+                //legendExpand.expanded = newValue !== "xsmall";
+            });
+
+            const bookmarksWidget = new Bookmarks({
+                view: view,
+                editingEnabled: true,
+                visibleElements: {
+                    time: false // don't show the time (h:m:s) next to the date
+                }
+            });
+            const bookmarksExpand = new Expand({
+                view: view,
+                content: bookmarksWidget
+            });
+            view.ui.add(bookmarksExpand, "top-right");
+
+            bookmarksWidget.on("select-bookmark", (event) => {
+                bookmarksExpand.expanded = false;
+            });
+
+            // Displays instructions to the user for understanding the sample
+            // And places them in an Expand widget instance
+            const clearBtn = document.getElementById("clearFilter");
+            view.ui.add(clearBtn, "bottom-right")
+            const sampleInstructions = document.createElement("div");
+            sampleInstructions.style.padding = "10px";
+            sampleInstructions.style.backgroundColor = "white";
+            sampleInstructions.style.width = "300px";
+            sampleInstructions.innerHTML = [
+                "<b>拖拽</b> 图面图层查询指针100英里范围内数据"
+            ].join(" ");
+
+            const instructionsExpand = new Expand({
+                expandIconClass: "esri-icon-question",
+                expandTooltip: "How to use this sample",
+                view: view,
+                content: sampleInstructions
+            });
+            view.ui.add(instructionsExpand, "top-left");
+
+            let highlightHandle = null;
+
+            /**
+             * Create charts and start querying the layer view when
+             * the view is ready and data begins to draw in the view
+             */
+            view.when().then(() => {
+                // Create the charts when the view is ready
+                createCharts();
+
+                const layer = map.layers.getItemAt(1);
+                const corov = map.layers.getItemAt(0);
+
+                layer.outFields = ['*'];
+                view.whenLayerView(layer).then((layerView) => {
+                    reactiveUtils
+                        .whenOnce(() => !layerView.updating)
+                        .then(() => {
+                            // Query layer view statistics as the user clicks
+                            // or drags the pointer across the view.
+                            view.on(["drag"], (event) => {
+                                // disables navigation by pointer drag
+                                event.stopPropagation();
+                                queryStatsOnDrag(layerView, event)
+                                    .then(updateCharts)
+                                    .catch((error) => {
+                                        if (error.name !== "AbortError") {
+                                            console.error(error);
+                                        }
+                                    });
+                            });
+                        });
+                });
+            });
+
+            /**
+             * Queries statistics against the layer view at the given screen location
+             */
+            const queryStatsOnDrag = promiseUtils.debounce((layerView, event) => {
+                // create a query object for the highlight and the statistics query
+
+                const query = layerView.layer.createQuery();
+                query.geometry = view.toMap(event); // converts the screen point to a map point
+                query.distance = 100; // queries all features within 1 mile of the point
+                query.units = "miles";
+
+                const statsQuery = query.clone();
+                const statDefinitions = [
+
+                    {
+                        onStatisticField:"CASE WHEN year > 2020 THEN 0 ELSE 1 END",
+                        outStatisticFieldName: "a2020",
+                        statisticType: "sum"
+                    },
+
+                    {
+                        onStatisticField: "CASE WHEN year < 2022 AND year > 2020 THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "a2021",
+                        statisticType: "sum"
+                    }, {
+                        onStatisticField: "CASE WHEN year < 2022 THEN 0 ELSE 1 END",
+                        outStatisticFieldName: "a2022",
+                        statisticType: "sum"
+                    }, {
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Student%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Student",
+                        statisticType: "sum"
+                    }, {
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Labour%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Labour",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Black%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Black",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Worker%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Worker",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Women%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Women",
+                        statisticType: "sum"
+                    },
+                    {
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Democratic%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Democratic",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN assoc_actor_1 LIKE '%Chin%'OR assoc_actor_1 LIKE '%Asian%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "Asian",
+                        statisticType: "sum"
+                    }, {
+                        onStatisticField: "year",
+                        outStatisticFieldName: "aall",
+                        statisticType: "count"
+                    },{
+                        onStatisticField: "CASE WHEN notes LIKE '%dozens%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "dozen",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN notes LIKE '%hundred%' OR notes LIKE '%100%' THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "hundred",
+                        statisticType: "sum"
+                    },{
+                        onStatisticField: "CASE WHEN notes LIKE '%50%' OR notes LIKE '%40%'OR notes LIKE '%30%'THEN 1 ELSE 0 END",
+                        outStatisticFieldName: "a50",
+                        statisticType: "sum"
+                    }
+                ];
+
+                // add the stat definitions to the the statistics query object cloned earlier
+
+                statsQuery.outStatistics = statDefinitions;
+                // execute the query for all features in the layer view
+                const allStatsResponse = layerView.queryFeatures(statsQuery).then(
+                    (response) => {
+                        const stats = response.features[0].attributes;
+                        console.log(stats)
+                        return stats;
+
+                    },
+                    (e) => {
+                        console.error(e);
+                    }
+                );
+
+                const openStatsQuery = statsQuery.clone();
+                openStatsQuery.where = "event_type = 'Protests'";
+
+                // execute the query for only unsolved homicides in the layer view
+                const unsolvedStatsResponse = layerView.queryFeatures(openStatsQuery).then(
+                    (response) => {
+                        const stats = response.features[0].attributes;
+                        //console.log(stats)
+                        return stats;
+                    },
+                    (e) => {
+                        console.error(e);
+                    }
+                );
+
+
+                // highlight all features within the query distance
+                layerView.queryObjectIds(query).then((ids) => {
+                    if (highlightHandle) {
+                        highlightHandle.remove();
+                        highlightHandle = null;
+                    }
+                    highlightHandle = layerView.highlight(ids);
+                });
+
+                // Return the promises that will resolve to each set of statistics
+                return promiseUtils.eachAlways([allStatsResponse, unsolvedStatsResponse]);
+            });
+
+            /**
+             * Updates the charts with the data returned from the statistic queries.
+             */
+            function updateCharts(responses) {
+                const allStats = responses[0].value;
+                const unsolvedStats = responses[1].value;
+
+
+                const yearChartStats = {
+                    solved: [ unsolvedStats.a2020,
+                        unsolvedStats.a2021,
+                        unsolvedStats.a2022
+
+                    ],
+                    unsolved: [
+                        allStats.a2020-unsolvedStats.a2020 ,
+                        allStats.a2021 -unsolvedStats.a2021,
+                        allStats.a2022-unsolvedStats.a2022
+                    ],
+
+                };
+                updateChart(yearChart, yearChartStats);
+
+                const ageChartStats = {
+                    solved: [
+                        unsolvedStats.Student,
+                        unsolvedStats.Black,
+                        unsolvedStats.Women,
+                        unsolvedStats.Worker+unsolvedStats.Labour,
+                        unsolvedStats.Asian,
+                        unsolvedStats.Democratic
+                    ],
+
+                    unsolved: [
+                       allStats.Student - unsolvedStats.Student,
+                        allStats.Black- unsolvedStats.Black,
+                        allStats.Women - unsolvedStats.Women,
+                        allStats.Worker+allStats.Labour- unsolvedStats.Labour-unsolvedStats.Worker,
+                        allStats.Asian- unsolvedStats.Asian,
+                        allStats.Democratic- unsolvedStats.Democratic,
+                    ]
+                };
+                updateChart(ageChart, ageChartStats);
+
+                const dispositionStats = [allStats.a2020, allStats.a2021, allStats.a2022];
+                updateChart(dispositionChart, dispositionStats);
+
+                const raceStats = [allStats.dozen, allStats.a50 , allStats.hundred];
+                updateChart(raceChart, raceStats);
+
+                // Update the total numbers in the title UI element
+                avgAge.innerHTML = Math.floor(allStats.aall/3);
+                totalNumber.innerHTML = allStats.aall;
+                avgOpenTime.innerHTML = Math.floor(unsolvedStats.aall/3);
+            }
+
+            /**
+             * Updates the given chart with new data
+             */
+            function updateChart(chart, dataValues) {
+                if (chart.config.type === "doughnut") {
+                    chart.data.datasets[0].data = dataValues;
+                } else {
+                    chart.data.datasets[0].data = dataValues.solved;
+                    chart.data.datasets[1].data = dataValues.unsolved;
+                }
+                chart.update();
+            }
+            /**
+             * Creates 5 charts for summarizing homicide data
+             */
+            function createCharts() {
+                totalNumber = document.getElementById("num-homicides");
+                avgAge = document.getElementById("avg-age");
+                avgOpenTime = document.getElementById("avg-open-time");
+
+                const yearCanvas = document.getElementById("year-chart");
+                yearChart = new Chart(yearCanvas.getContext("2d"), {
+                    type: "bar",
+                    data: {
+                        labels: ["2020", "2021", "2022"],
+                        datasets: [
+                            {
+                                label: "抗议",
+                                backgroundColor: "#9b95c9",
+                                stack: "Stack 0",
+                                data: [0, 0, 0]
+                            },
+                            {
+                                label: "暴乱/其他更加严重的骚乱",
+                                backgroundColor: "#3c3645",
+                                stack: "Stack 0",
+                                data: [0, 0, 0]
+                            },
+
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        legend: {
+                            position: "top"
+                        },
+                        title: {
+                            display: true,
+                            text: "不同年份不同类型的暴乱对比"
+                        },
+                        scales: {
+                            xAxes: [
+                                {
+                                    stacked: true
+                                }
+                            ],
+                            yAxes: [
+                                {
+                                    stacked: true,
+                                    ticks: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                });
+
+                const ageCanvas = document.getElementById("age-chart");
+                ageChart = new Chart(ageCanvas.getContext("2d"), {
+                    type: "horizontalBar",
+                    data: {
+                        labels: ["学生", "黑人", "女人", "工人与劳动人民", "亚洲人", "民主党"],
+                        datasets: [
+                            {
+                                label: "抗议",
+                                backgroundColor: "#9b95c9",
+                                stack: "Stack 0",
+                                data: [0, 0, 0, 0, 0, 0]
+                            },
+                            {
+                                label: "暴乱/其他更加严重的骚乱",
+                                backgroundColor: "#3c3645",
+                                stack: "Stack 0",
+                                data: [0, 0, 0, 0, 0, 0]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        legend: {
+                            position: "top"
+                        },
+                        title: {
+                            display: true,
+                            text: "涉及人员类型"
+                        },
+                        scales: {
+                            xAxes: [
+                                {
+                                    stacked: true,
+                                    ticks: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            ],
+                            yAxes: [
+                                {
+                                    stacked: true
+                                }
+                            ]
+                        }
+                    }
+                });
+
+                const dispositionCanvas = document.getElementById("disposition-chart");
+                dispositionChart = new Chart(dispositionCanvas.getContext("2d"), {
+                    type: "doughnut",
+                    data: {
+                        labels: ["2020年", "2021年", "2022年"],
+                        datasets: [
+                            {
+                                backgroundColor: ["#9b95c9", "#3c3645", "#d3c6a6"],
+                                borderColor: "rgb(255, 255, 255)",
+                                borderWidth: 1,
+                                data: [0, 0, 0]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        cutoutPercentage: 35,
+                        legend: {
+                            position: "top"
+                        },
+                        title: {
+                            display: true,
+                            text: "不同年份发生事件数对比"
+                        }
+                    }
+                });
+                const race = document.getElementById("race-chart");
+                raceChart = new Chart(race.getContext("2d"), {
+                    type: "doughnut",
+                    data: {
+                        labels: ["十几人", "小于50人", "大于100人"],
+                        datasets: [
+                            {
+                                backgroundColor: ["#a8aec0", "#6f6d85", "#594c6d"],
+                                borderColor: "rgb(255, 255, 255)",
+                                borderWidth: 1,
+                                data: [0, 0, 0]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        cutoutPercentage: 35,
+                        legend: {
+                            position: "bottom"
+                        },
+                        title: {
+                            display: true,
+                            text: "事件规模"
+                        }
+                    }
+                });
+            }
+            const viewdiv = document.getElementById("viewDiv")
+            const viewslide = document.getElementById("viewslide")
+            const panel = document.getElementById("panel")
+            view.ui.add(document.getElementById("mainDiv"), "bottom-right");
+            // Add UI elements to the view
+            const checkboxEle = document.getElementById("checkboxId");
+            const labelText = document.getElementById("labelText");
+            const appContainer = document.getElementById("appContainer");
+            // Listen for when toggle is changed, call toggleFeatureTable function
+            checkboxEle.onchange = () => {
+                toggleFeatureTable1();
+            };
+
+            function toggleFeatureTable1() {
+                // Check if the table is displayed, if so, toggle off. If not, display.
+                if (!checkboxEle.checked) {
+                    appContainer.removeChild(panel);
+                    viewdiv.style.width = "100%"
+                    labelText.innerHTML = "显示表格";
+
+                } else {
+                    appContainer.appendChild(panel);
+                    viewdiv.style.width = "79%"
+                    labelText.innerHTML = "隐藏表格";
+                }
+            }
+        });
+
+    </script>
+</head>
+<body>
+<div id="appContainer">
+<div id="viewDiv"></div>
+<div id="infoDiv1">
+    <input
+            class="esri-component esri-widget--button esri-widget esri-interactive"
+            type="button"
+            id="switch-btn"
+            value="3D"
+    />
+</div>
+<div id="mainDiv" class="esri-widget">
+    <label class="switch">
+        <input id="checkboxId" type="checkbox" checked="yes" />
+        <span class="slider round"></span>
+    </label>
+    <label class="labelText" id="labelText">隐藏表格</label>
+</div>
+<div id="panel"class="container">
+    <div style="padding: 15px;">
+        <canvas id="year-chart" height="300" width="200"></canvas>
+        <canvas id="age-chart" height="270" width="250"></canvas>
+        <canvas id="disposition-chart" width="200" height="200" style="float:none;"></canvas>
+        <canvas id="race-chart" width="250" height="250" style="float:none;"></canvas>
+    </div>
+</div>
+<div id="infoDiv" class="esri-widget">
+    不同年份:
+    <select id="filter" class="esri-select">
+        <option value="">All</option>
+        <option value='2020'>2020</option>
+        <option value='2021'>2021</option>
+        <option value='2022'>2022</option>
+    </select>
+    <div style="padding-top: 10px;">
+        <button id="toggle-cluster" class="esri-button">取消聚类</button>
+    </div>
+    <div id="legendDiv"></div>
+</div>
+</div>
+</body>
+</html>
